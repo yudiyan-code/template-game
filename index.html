@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Próximo Nível - Vida como RPG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Roboto&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      padding: 20px;
+    }
+    header {
+      text-align: center;
+      padding: 20px 0;
+    }
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5em;
+      color: #00ffe1;
+    }
+    .dashboard, .missions, .daily-missions, .rewards, .log {
+      background-color: #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 0 10px rgba(0,255,255,0.1);
+    }
+    .section-title {
+      font-size: 1.8em;
+      color: #00ffe1;
+      margin-bottom: 10px;
+    }
+    .card {
+      background-color: #2a2a2a;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .xp-bar {
+      height: 10px;
+      background: #333;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .xp-fill {
+      height: 100%;
+      background: #00ffe1;
+      width: 0%;
+    }
+    .btn {
+      background: #00ffe1;
+      color: #121212;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    .btn:hover {
+      background: #00c8b0;
+    }
+    .character {
+      width: 150px;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin: 20px auto;
+      display: block;
+      border: 3px solid #00ffe1;
+    }
+    .input-task, .input-reward, .input-daily-task {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    input[type="text"], input[type="number"] {
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      flex: 1;
+      min-width: 150px;
+    }
+    .tools {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🌌 Próximo Nível</h1>
+    <p>Transforme sua vida em um jogo RPG</p>
+  </header>
+
+  <section class="dashboard">
+    <div class="section-title">🎖️ Status do Personagem</div>
+    <img id="character-img" class="character" src="https://i.imgur.com/v4E4gA2.png" alt="Personagem">
+    <p>Nome: Yudi</p>
+    <p id="rank">Rank: E</p>
+    <p id="level">Nível: 1</p>
+    <p id="xp">XP: 0 / 100</p>
+    <div class="xp-bar"><div class="xp-fill" id="xp-bar"></div></div>
+    <div class="tools">
+      <button class="btn" onclick="resetGame()">🔄 Resetar Progresso</button>
+      <button class="btn" onclick="exportData()">💾 Exportar Progresso</button>
+      <input type="file" accept="application/json" onchange="importData(event)" style="display:none;" id="import-file"/>
+      <label for="import-file" class="btn">📂 Importar Progresso</label>
+    </div>
+  </section>
+
+  <section class="missions">
+    <div class="section-title">🗺️ Missões</div>
+    <div class="input-task">
+      <input type="text" id="mission-name" placeholder="Nome da missão">
+      <input type="number" id="mission-xp" placeholder="XP">
+      <button class="btn" onclick="addMission()">Adicionar</button>
+    </div>
+    <div id="mission-list"></div>
+  </section>
+
+  <section class="daily-missions">
+    <div class="section-title">⏳ Missões Diárias</div>
+    <div class="input-daily-task">
+      <input type="text" id="daily-name" placeholder="Missão do dia">
+      <input type="number" id="daily-xp" placeholder="XP">
+      <button class="btn" onclick="addDailyMission()">Adicionar</button>
+    </div>
+    <div id="daily-list"></div>
+  </section>
+
+  <section class="rewards">
+    <div class="section-title">🎁 Recompensas</div>
+    <div class="input-reward">
+      <input type="text" id="reward-name" placeholder="Nome da recompensa">
+      <input type="number" id="reward-cost" placeholder="Custo XP">
+      <button class="btn" onclick="addReward()">Adicionar</button>
+    </div>
+    <div id="reward-list"></div>
+  </section>
+
+  <section class="log">
+    <div class="section-title">📜 Logs de Batalha</div>
+    <div id="log"></div>
+  </section>
+
+  <script>
+    let xp = parseInt(localStorage.getItem('xp')) || 0;
+    let level = parseInt(localStorage.getItem('level')) || 1;
+    let rank = localStorage.getItem('rank') || 'E';
+    let missionList = JSON.parse(localStorage.getItem('missions') || '[]');
+    let rewardList = JSON.parse(localStorage.getItem('rewards') || '[]');
+    let log = JSON.parse(localStorage.getItem('log') || '[]');
+
+    const today = new Date().toLocaleDateString();
+    let dailyMissions = JSON.parse(localStorage.getItem('dailyMissions') || '[]');
+    if (!localStorage.getItem('dailyDate') || localStorage.getItem('dailyDate') !== today) {
+      dailyMissions = [];
+      localStorage.setItem('dailyDate', today);
+    }
+
+    const xpBar = document.getElementById('xp-bar');
+    const xpText = document.getElementById('xp');
+    const levelText = document.getElementById('level');
+    const rankText = document.getElementById('rank');
+    const logEl = document.getElementById('log');
+    const charImg = document.getElementById('character-img');
+
+    function updateUI() {
+      let maxXp = level * 100;
+      xpText.textContent = `XP: ${xp} / ${maxXp}`;
+      levelText.textContent = `Nível: ${level}`;
+      rankText.textContent = `Rank: ${rank}`;
+      xpBar.style.width = `${(xp / maxXp) * 100}%`;
+      updateCharacterImage();
+      renderMissions();
+      renderRewards();
+      renderLog();
+      renderDailyMissions();
+    }
+
+    function updateCharacterImage() {
+      const rankImages = {
+        'E': 'https://johto.legiaodosherois.com.br/wp-content/uploads/2024/03/legiao_91PscrIUtRVk.jpg',
+        'D': 'https://payment.unipin.com/core2/tnt/dm/cms/posts/file/public/953194f4-8de1-4521-9b17-66d9ba9fed5e?tenantCode=upstation_x',
+        'C': 'https://i.redd.it/jin-woo-s2-teaser-image-extended-v0-m5063atjlirc1.jpg',
+        'B': 'https://i.pinimg.com/736x/26/46/bb/2646bb8aa77f9af182b84ad512bb4d79.jpg',
+        'A': 'https://p2.trrsf.com/image/fget/cf/1200/900/middle/images.terra.com/2024/04/05/solo-leveling-capa-r1lot7kak94g.jpeg',
+        'S': 'https://static.promediateknologi.id/crop/11x14:724x635/0x0/webp/photo/p2/74/2024/03/21/213f3f1f5cc8200051601bc5c0ed9047-114344616.jpg'
+      };
+      charImg.src = rankImages[rank];
+    }
+
+    function gainXP(amount) {
+      xp += amount;
+      let maxXp = level * 100;
+      while (xp >= maxXp) {
+        xp -= maxXp;
+        level++;
+        checkRank();
+        maxXp = level * 100;
+      }
+      saveState();
+      updateUI();
+    }
+
+    function checkRank() {
+      const ranks = ['E', 'D', 'C', 'B', 'A', 'S'];
+      rank = ranks[Math.min(Math.floor(level / 5), ranks.length - 1)];
+    }
+
+    function addMission() {
+      const name = document.getElementById('mission-name').value;
+      const amount = parseInt(document.getElementById('mission-xp').value);
+      if (!name || isNaN(amount)) return;
+      missionList.push({ name, amount });
+      saveState();
+      renderMissions();
+    }
+
+    function renderMissions() {
+      const container = document.getElementById('mission-list');
+      container.innerHTML = '';
+      missionList.forEach((m, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <span>${m.name} (+${m.amount} XP)</span>
+          <div style="display: flex; gap: 5px;">
+            <button class='btn' onclick='completeMission(${i})'>✔️</button>
+            <button class='btn' onclick='editMission(${i})'>✏️</button>
+            <button class='btn' onclick='deleteMission(${i})'>🗑️</button>
+          </div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function completeMission(index) {
+      gainXP(missionList[index].amount);
+      log.push(`✔️ ${new Date().toLocaleDateString()} - Missão: ${missionList[index].name}`);
+      saveState();
+    }
+
+    function editMission(index) {
+      const newName = prompt('Novo nome da missão:', missionList[index].name);
+      const newXP = parseInt(prompt('Novo valor de XP:', missionList[index].amount));
+      if (newName && !isNaN(newXP)) {
+        missionList[index] = { name: newName, amount: newXP };
+        saveState();
+        renderMissions();
+      }
+    }
+
+    function deleteMission(index) {
+      if (confirm('Deseja excluir esta missão?')) {
+        missionList.splice(index, 1);
+        saveState();
+        renderMissions();
+      }
+    }
+
+    function addDailyMission() {
+      const name = document.getElementById('daily-name').value;
+      const amount = parseInt(document.getElementById('daily-xp').value);
+      if (!name || isNaN(amount)) return;
+      dailyMissions.push({ name, amount, completed: false });
+      saveState();
+      renderDailyMissions();
+    }
+
+    function completeDailyMission(index) {
+      if (!dailyMissions[index].completed) {
+        dailyMissions[index].completed = true;
+        gainXP(dailyMissions[index].amount);
+        log.push(`☀️ ${today} - Missão Diária: ${dailyMissions[index].name}`);
+        saveState();
+        renderDailyMissions();
+      }
+    }
+
+    function renderDailyMissions() {
+      const container = document.getElementById('daily-list');
+      container.innerHTML = '';
+      dailyMissions.forEach((m, i) => {
+        const status = m.completed
+          ? '✅'
+          : `<button class='btn' onclick='completeDailyMission(${i})'>✔️</button>`;
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <span>${m.name} (+${m.amount} XP)</span>
+          <div style="display: flex; gap: 5px;">
+            ${status}
+            <button class='btn' onclick='editDailyMission(${i})'>✏️</button>
+            <button class='btn' onclick='deleteDailyMission(${i})'>🗑️</button>
+          </div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function editDailyMission(index) {
+      const newName = prompt('Novo nome da missão diária:', dailyMissions[index].name);
+      const newXP = parseInt(prompt('Novo valor de XP:', dailyMissions[index].amount));
+      if (newName && !isNaN(newXP)) {
+        dailyMissions[index].name = newName;
+        dailyMissions[index].amount = newXP;
+        saveState();
+        renderDailyMissions();
+      }
+    }
+
+    function deleteDailyMission(index) {
+      if (confirm('Deseja excluir esta missão diária?')) {
+        dailyMissions.splice(index, 1);
+        saveState();
+        renderDailyMissions();
+      }
+    }
+
+    function addReward() {
+      const name = document.getElementById('reward-name').value;
+      const cost = parseInt(document.getElementById('reward-cost').value);
+      if (!name || isNaN(cost)) return;
+      rewardList.push({ name, cost });
+      saveState();
+      renderRewards();
+    }
+
+    function renderRewards() {
+      const container = document.getElementById('reward-list');
+      container.innerHTML = '';
+      rewardList.forEach((r, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <span>${r.name} (${r.cost} XP)</span>
+          <div style="display: flex; gap: 5px;">
+            <button class='btn' onclick='claimReward(${i})'>🎁</button>
+            <button class='btn' onclick='editReward(${i})'>✏️</button>
+            <button class='btn' onclick='deleteReward(${i})'>🗑️</button>
+          </div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function editReward(index) {
+      const newName = prompt('Novo nome da recompensa:', rewardList[index].name);
+      const newCost = parseInt(prompt('Novo custo em XP:', rewardList[index].cost));
+      if (newName && !isNaN(newCost)) {
+        rewardList[index] = { name: newName, cost: newCost };
+        saveState();
+        renderRewards();
+      }
+    }
+
+    function deleteReward(index) {
+      if (confirm('Deseja excluir esta recompensa?')) {
+        rewardList.splice(index, 1);
+        saveState();
+        renderRewards();
+      }
+    }
+
+    function claimReward(index) {
+      if (xp >= rewardList[index].cost) {
+        xp -= rewardList[index].cost;
+        log.push(`🎁 ${new Date().toLocaleDateString()} - Recompensa: ${rewardList[index].name}`);
+        saveState();
+        updateUI();
+      } else {
+        alert('XP insuficiente!');
+      }
+    }
+
+    function renderLog() {
+      logEl.innerHTML = log.map(entry => `<p>${entry}</p>`).join('');
+    }
+
+    function saveState() {
+      localStorage.setItem('xp', xp);
+      localStorage.setItem('level', level);
+      localStorage.setItem('rank', rank);
+      localStorage.setItem('missions', JSON.stringify(missionList));
+      localStorage.setItem('rewards', JSON.stringify(rewardList));
+      localStorage.setItem('log', JSON.stringify(log));
+      localStorage.setItem('dailyMissions', JSON.stringify(dailyMissions));
+    }
+
+    function resetGame() {
+      if (confirm('Tem certeza que deseja resetar tudo?')) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    function exportData() {
+      const data = {
+        xp, level, rank, missionList, rewardList, log, dailyMissions
+      };
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'progresso-rpg.json';
+      a.click();
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          xp = data.xp || 0;
+          level = data.level || 1;
+          rank = data.rank || 'E';
+          missionList = data.missionList || [];
+          rewardList = data.rewardList || [];
+          log = data.log || [];
+          dailyMissions = data.dailyMissions || [];
+          saveState();
+          updateUI();
+        } catch {
+          alert('Erro ao importar arquivo.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    updateUI();
+  </script>
+</body>
+</html>
